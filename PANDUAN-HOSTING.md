@@ -1,6 +1,6 @@
 # Panduan Menjalankan & Hosting Sendiri (Gratis)
 
-Aplikasi: Merapi Tani Daily Report System
+Aplikasi: Merapi Tani Instrumen Daily Report System
 Teknologi: React + TanStack Start + Vite, database & login memakai Supabase.
 
 ---
