@@ -213,8 +213,47 @@ Deno.serve(async (request: Request) => {
       return jsonResponse({ error: "Gagal membuat akun pengguna" }, 400);
     }
 
-    // profiles dan user_roles dibuat oleh trigger handle_new_user pada
-    // migration. Metadata di atas dipakai trigger untuk mengisi keduanya.
+    // Trigger handle_new_user tetap boleh mengisi data lebih dulu. Upsert
+    // eksplisit di sini diperlukan agar pembuatan pengguna tetap berhasil
+    // walaupun trigger belum terpasang pada project Supabase atau gagal
+    // mengisi salah satu tabel.
+    const { error: profileError } = await adminClient.from("profiles").upsert(
+      {
+        id: created.user.id,
+        nama,
+        email,
+        nik_nim: nikNim,
+        no_hp: noHp,
+        jabatan,
+        divisi_id: divisiId,
+        status_aktif: false,
+      },
+      { onConflict: "id" },
+    );
+
+    if (profileError) {
+      console.error("Gagal menyimpan profil pengguna:", profileError);
+      await adminClient.from("profiles").delete().eq("id", created.user.id);
+      await adminClient.auth.admin.deleteUser(created.user.id);
+      return jsonResponse({ error: "Akun dibuat, tetapi data profil gagal disimpan" }, 500);
+    }
+
+    const { error: roleError } = await adminClient.from("user_roles").upsert(
+      {
+        user_id: created.user.id,
+        role,
+      },
+      { onConflict: "user_id,role" },
+    );
+
+    if (roleError) {
+      console.error("Gagal menyimpan role pengguna:", roleError);
+      await adminClient.from("user_roles").delete().eq("user_id", created.user.id);
+      await adminClient.from("profiles").delete().eq("id", created.user.id);
+      await adminClient.auth.admin.deleteUser(created.user.id);
+      return jsonResponse({ error: "Akun dibuat, tetapi peran pengguna gagal disimpan" }, 500);
+    }
+
     return jsonResponse({
       message: "Akun pengguna berhasil dibuat",
       user: {

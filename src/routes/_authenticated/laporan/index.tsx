@@ -38,13 +38,13 @@ import {
 export const Route = createFileRoute("/_authenticated/laporan/")({
   head: () => ({
     meta: [
-      { title: "Laporan Harian — Merapi Tani Daily Report System" },
+      { title: "Laporan Harian — Merapi Tani Instrumen Daily Report System" },
       {
         name: "description",
         content:
           "Daftar laporan harian karyawan dan anak magang, lengkap dengan filter divisi, tanggal, status validasi, dan ekspor data.",
       },
-      { property: "og:title", content: "Laporan Harian — Merapi Tani Daily Report System" },
+      { property: "og:title", content: "Laporan Harian — Merapi Tani Instrumen Daily Report System" },
       {
         property: "og:description",
         content: "Kelola dan pantau seluruh laporan harian tim PT Merapi Tani Instrumen.",

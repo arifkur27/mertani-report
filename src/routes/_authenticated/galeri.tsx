@@ -21,12 +21,12 @@ import {
 export const Route = createFileRoute("/_authenticated/galeri")({
   head: () => ({
     meta: [
-      { title: "Galeri Bukti Kerja — Merapi Tani" },
+      { title: "Galeri Bukti Kerja — Merapi Tani Instrumen" },
       {
         name: "description",
         content: "Kumpulan foto bukti pekerjaan harian tim PT Merapi Tani Instrumen.",
       },
-      { property: "og:title", content: "Galeri Bukti Kerja — Merapi Tani" },
+      { property: "og:title", content: "Galeri Bukti Kerja — Merapi Tani Instrumen" },
       {
         property: "og:description",
         content: "Telusuri foto bukti pekerjaan berdasarkan divisi dan tanggal.",

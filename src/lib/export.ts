@@ -87,7 +87,7 @@ export function exportXLSX(rows: ExportRow[], filename: string) {
 export function exportPDF(rows: ExportRow[], filename: string, subtitle: string) {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   doc.setFontSize(14);
-  doc.text("Merapi Tani Daily Report System", 40, 36);
+  doc.text("Merapi Tani Instrumen Daily Report System", 40, 36);
   doc.setFontSize(9);
   doc.text(`PT Merapi Tani Instrumen — ${subtitle}`, 40, 52);
   autoTable(doc, {

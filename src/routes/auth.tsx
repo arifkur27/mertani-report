@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Leaf, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchDivisi } from "@/lib/reports";
@@ -24,13 +24,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Masuk — Merapi Tani Daily Report System" },
+      { title: "Masuk — Merapi Tani Instrumen Daily Report System" },
       {
         name: "description",
         content:
           "Halaman masuk dan pendaftaran anak magang untuk sistem laporan harian PT Merapi Tani Instrumen.",
       },
-      { property: "og:title", content: "Masuk — Merapi Tani Daily Report System" },
+      { property: "og:title", content: "Masuk — Merapi Tani Instrumen Daily Report System" },
       {
         property: "og:description",
         content: "Login karyawan dan pendaftaran anak magang PT Merapi Tani Instrumen.",
@@ -141,11 +141,11 @@ function AuthPage() {
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="relative hidden flex-col justify-between bg-brand-gradient p-10 text-primary-foreground lg:flex">
         <div className="flex items-center gap-3">
-          <div className="grid size-11 place-items-center rounded-xl bg-primary-foreground/15">
-            <Leaf className="size-5" />
+          <div className="grid size-11 place-items-center overflow-hidden rounded-xl bg-white">
+            <img src="/mertani-logo.png" alt="Logo Mertani" className="size-full object-contain" />
           </div>
           <div>
-            <p className="font-display text-lg font-bold">Merapi Tani</p>
+            <p className="font-display text-lg font-bold">Merapi Tani Instrumen</p>
             <p className="text-sm opacity-80">Daily Report System</p>
           </div>
         </div>
@@ -183,7 +183,7 @@ function AuthPage() {
       <div className="flex items-center justify-center bg-background px-4 py-10">
         <div className="w-full max-w-md">
           <div className="mb-6 flex items-center justify-between lg:hidden">
-            <p className="font-display font-bold">Merapi Tani</p>
+            <p className="font-display font-bold">Merapi Tani Instrumen</p>
             <ThemeToggle />
           </div>
           <Card className="shadow-card">
