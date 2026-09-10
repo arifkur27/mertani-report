@@ -38,13 +38,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Merapi Tani Instrumen Daily Report System" },
+      { title: "Dashboard — Merapi Tani Daily Report System" },
       {
         name: "description",
         content:
           "Ringkasan laporan harian, statistik divisi, dan progres kerja karyawan serta anak magang PT Merapi Tani Instrumen.",
       },
-      { property: "og:title", content: "Dashboard — Merapi Tani Instrumen Daily Report System" },
+      { property: "og:title", content: "Dashboard — Merapi Tani Daily Report System" },
       {
         property: "og:description",
         content: "Statistik laporan harian dan progres tim PT Merapi Tani Instrumen.",

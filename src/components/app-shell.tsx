@@ -116,11 +116,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       >
         <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-4">
-          <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-white">
-            <img src="/mertani-logo.png" alt="Logo Mertani" className="size-full object-contain" />
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-sidebar-primary font-display text-sm font-bold text-sidebar-primary-foreground">
+            MT
           </div>
           <div className="min-w-0">
-            <p className="truncate font-display text-sm font-semibold">Merapi Tani Instrumen</p>
+            <p className="truncate font-display text-sm font-semibold">Merapi Tani</p>
             <p className="truncate text-xs text-sidebar-foreground/70">Daily Report System</p>
           </div>
           <Button

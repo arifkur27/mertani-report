@@ -1,4 +1,4 @@
-export const APP_NAME = "Merapi Tani Instrumen Daily Report System";
+export const APP_NAME = "Merapi Tani Daily Report System";
 export const COMPANY = "PT Merapi Tani Instrumen";
 
 export type AppRole = "admin" | "supervisor" | "karyawan" | "magang";

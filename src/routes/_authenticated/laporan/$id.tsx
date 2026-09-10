@@ -27,12 +27,12 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/_authenticated/laporan/$id")({
   head: () => ({
     meta: [
-      { title: "Detail Laporan Harian — Merapi Tani Instrumen" },
+      { title: "Detail Laporan Harian — Merapi Tani" },
       {
         name: "description",
         content: "Rincian laporan harian, foto bukti, dan status validasi supervisor.",
       },
-      { property: "og:title", content: "Detail Laporan Harian — Merapi Tani Instrumen" },
+      { property: "og:title", content: "Detail Laporan Harian — Merapi Tani" },
       {
         property: "og:description",
         content: "Rincian pekerjaan, kendala, progress, foto bukti, dan catatan validasi.",

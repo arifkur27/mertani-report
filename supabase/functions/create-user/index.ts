@@ -2,11 +2,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const roles = ["admin", "supervisor", "karyawan", "magang"] as const;
+const roles = [
+  "admin",
+  "supervisor",
+  "karyawan",
+  "magang",
+] as const;
+
 type AppRole = (typeof roles)[number];
 
 type CreateUserPayload = {
@@ -20,7 +27,10 @@ type CreateUserPayload = {
   role?: unknown;
 };
 
-function jsonResponse(body: Record<string, unknown>, status = 200) {
+function jsonResponse(
+  body: Record<string, unknown>,
+  status = 200
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -31,237 +41,532 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 }
 
 function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
 }
 
-function optionalText(value: unknown, field: string, maxLength = 255) {
-  if (value == null || value === "") return null;
+function optionalText(
+  value: unknown,
+  field: string,
+  maxLength = 255
+) {
+  if (value == null || value === "") {
+    return null;
+  }
 
   if (typeof value !== "string") {
     throw new Error(`${field} harus berupa teks`);
   }
 
   const text = value.trim();
+
   if (text.length > maxLength) {
-    throw new Error(`${field} maksimal ${maxLength} karakter`);
+    throw new Error(
+      `${field} maksimal ${maxLength} karakter`
+    );
   }
 
   return text || null;
 }
 
 function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    return error.message;
+  }
+
   return "Terjadi kesalahan saat membuat akun pengguna";
 }
 
 Deno.serve(async (request: Request) => {
+  // =====================================================
+  // CORS
+  // =====================================================
+
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", {
+      headers: corsHeaders,
+    });
   }
 
   if (request.method !== "POST") {
-    return jsonResponse({ error: "Method tidak diizinkan" }, 405);
+    return jsonResponse(
+      {
+        error: "Method tidak diizinkan",
+      },
+      405
+    );
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const publicKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  // =====================================================
+  // SUPABASE CONFIGURATION
+  // =====================================================
 
-  if (!supabaseUrl || !publicKey || !serviceRoleKey) {
-    console.error("Konfigurasi Supabase untuk create-user belum lengkap");
-    return jsonResponse({ error: "Konfigurasi server belum lengkap" }, 500);
+  const supabaseUrl =
+    Deno.env.get("SUPABASE_URL");
+
+  const publicKey =
+    Deno.env.get("SUPABASE_ANON_KEY") ??
+    Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
+
+  const serviceRoleKey =
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (
+    !supabaseUrl ||
+    !publicKey ||
+    !serviceRoleKey
+  ) {
+    console.error(
+      "Konfigurasi Supabase untuk create-user belum lengkap",
+      {
+        hasUrl: !!supabaseUrl,
+        hasPublicKey: !!publicKey,
+        hasServiceRoleKey: !!serviceRoleKey,
+      }
+    );
+
+    return jsonResponse(
+      {
+        error: "Konfigurasi server belum lengkap",
+      },
+      500
+    );
   }
 
-  const authorization = request.headers.get("Authorization");
+  // =====================================================
+  // CEK TOKEN ADMIN
+  // =====================================================
+
+  const authorization =
+    request.headers.get("Authorization");
+
   if (!authorization?.startsWith("Bearer ")) {
-    return jsonResponse({ error: "Autentikasi diperlukan" }, 401);
+    return jsonResponse(
+      {
+        error: "Autentikasi diperlukan",
+      },
+      401
+    );
   }
 
-  const token = authorization.slice("Bearer ".length).trim();
+  const token =
+    authorization
+      .slice("Bearer ".length)
+      .trim();
+
   if (!token) {
-    return jsonResponse({ error: "Token autentikasi tidak valid" }, 401);
+    return jsonResponse(
+      {
+        error: "Token autentikasi tidak valid",
+      },
+      401
+    );
   }
 
-  const supabase = createClient(supabaseUrl, publicKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  // =====================================================
+  // CLIENT USER
+  // Digunakan untuk membaca user yang sedang login
+  // =====================================================
 
-  const { data: userData, error: userError } = await supabase.auth.getUser(token);
+  const supabase = createClient(
+    supabaseUrl,
+    publicKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
 
-  if (userError || !userData.user) {
-    return jsonResponse({ error: "Sesi pengguna tidak valid" }, 401);
+  const {
+    data: userData,
+    error: userError,
+  } =
+    await supabase.auth.getUser(token);
+
+  if (
+    userError ||
+    !userData.user
+  ) {
+    console.error(
+      "Sesi pengguna tidak valid:",
+      userError
+    );
+
+    return jsonResponse(
+      {
+        error: "Sesi pengguna tidak valid",
+      },
+      401
+    );
   }
 
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  // =====================================================
+  // ADMIN CLIENT
+  // Service Role hanya digunakan di server/Edge Function
+  // =====================================================
 
-  // Hanya admin aplikasi yang boleh memanggil endpoint ini.
-  const { data: adminRole, error: roleError } = await adminClient
+  const adminClient = createClient(
+    supabaseUrl,
+    serviceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+
+  // =====================================================
+  // CEK APAKAH PEMBUAT ADALAH ADMIN
+  // =====================================================
+
+  const {
+    data: adminRole,
+    error: roleError,
+  } = await adminClient
     .from("user_roles")
     .select("role")
-    .eq("user_id", userData.user.id)
+    .eq(
+      "user_id",
+      userData.user.id
+    )
     .eq("role", "admin")
     .maybeSingle();
 
   if (roleError) {
-    console.error("Gagal memeriksa hak akses pembuat akun:", roleError);
-    return jsonResponse({ error: "Gagal memeriksa hak akses" }, 500);
+    console.error(
+      "Gagal memeriksa hak akses:",
+      roleError
+    );
+
+    return jsonResponse(
+      {
+        error:
+          "Gagal memeriksa hak akses",
+      },
+      500
+    );
   }
 
   if (!adminRole) {
-    return jsonResponse({ error: "Hanya admin yang dapat membuat pengguna baru" }, 403);
+    return jsonResponse(
+      {
+        error:
+          "Hanya admin yang dapat membuat pengguna baru",
+      },
+      403
+    );
   }
+
+  // =====================================================
+  // BACA REQUEST BODY
+  // =====================================================
 
   let payload: CreateUserPayload;
+
   try {
-    const body: unknown = await request.json();
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return jsonResponse({ error: "Body request tidak valid" }, 400);
+    const body: unknown =
+      await request.json();
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "Body request tidak valid",
+        },
+        400
+      );
     }
-    payload = body as CreateUserPayload;
+
+    payload =
+      body as CreateUserPayload;
   } catch {
-    return jsonResponse({ error: "Body request harus berupa JSON yang valid" }, 400);
+    return jsonResponse(
+      {
+        error:
+          "Body request harus berupa JSON yang valid",
+      },
+      400
+    );
   }
 
+  // =====================================================
+  // VALIDASI DATA
+  // =====================================================
+
   try {
-    const nama = optionalText(payload.nama, "Nama lengkap", 150);
-    const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
-    const password = payload.password;
-    const role = payload.role;
+    const nama = optionalText(
+      payload.nama,
+      "Nama lengkap",
+      150
+    );
 
+    const email =
+      typeof payload.email === "string"
+        ? payload.email
+            .trim()
+            .toLowerCase()
+        : "";
+
+    const password =
+      payload.password;
+
+    const role =
+      payload.role;
+
+    // Nama
     if (!nama) {
-      throw new Error("Nama lengkap wajib diisi");
+      throw new Error(
+        "Nama lengkap wajib diisi"
+      );
     }
 
-    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error("Format email tidak valid");
+    // Email
+    if (
+      !email ||
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        email
+      )
+    ) {
+      throw new Error(
+        "Format email tidak valid"
+      );
     }
 
-    if (typeof password !== "string" || password.length < 6) {
-      throw new Error("Password minimal 6 karakter");
+    // Password
+    if (
+      typeof password !== "string" ||
+      password.length < 6
+    ) {
+      throw new Error(
+        "Password minimal 6 karakter"
+      );
     }
 
     if (password.length > 128) {
-      throw new Error("Password maksimal 128 karakter");
+      throw new Error(
+        "Password maksimal 128 karakter"
+      );
     }
 
-    if (typeof role !== "string" || !roles.includes(role as AppRole)) {
-      throw new Error("Role pengguna tidak valid");
+    // Role
+    if (
+      typeof role !== "string" ||
+      !roles.includes(
+        role as AppRole
+      )
+    ) {
+      throw new Error(
+        "Role pengguna tidak valid"
+      );
     }
 
-    const nikNim = optionalText(payload.nik_nim, "NIK/NIM");
-    const noHp = optionalText(payload.no_hp, "Nomor HP");
-    const jabatan = optionalText(payload.jabatan, "Jabatan");
-    const divisiId = optionalText(payload.divisi_id, "Divisi");
+    // Data tambahan
+    const nikNim =
+      optionalText(
+        payload.nik_nim,
+        "NIK/NIM"
+      );
 
-    if (divisiId && !isUuid(divisiId)) {
-      throw new Error("ID divisi tidak valid");
+    const noHp =
+      optionalText(
+        payload.no_hp,
+        "Nomor HP"
+      );
+
+    const jabatan =
+      optionalText(
+        payload.jabatan,
+        "Jabatan"
+      );
+
+    const divisiId =
+      optionalText(
+        payload.divisi_id,
+        "Divisi"
+      );
+
+    // =====================================================
+    // VALIDASI DIVISI
+    // =====================================================
+
+    if (
+      divisiId &&
+      !isUuid(divisiId)
+    ) {
+      throw new Error(
+        "ID divisi tidak valid"
+      );
     }
 
     if (divisiId) {
-      const { data: division, error: divisionError } = await adminClient
-        .from("divisi")
-        .select("id")
-        .eq("id", divisiId)
-        .maybeSingle();
+      const {
+        data: division,
+        error: divisionError,
+      } =
+        await adminClient
+          .from("divisi")
+          .select("id")
+          .eq("id", divisiId)
+          .maybeSingle();
 
       if (divisionError) {
-        console.error("Gagal memeriksa divisi:", divisionError);
-        return jsonResponse({ error: "Gagal memeriksa divisi" }, 500);
+        console.error(
+          "Gagal memeriksa divisi:",
+          divisionError
+        );
+
+        return jsonResponse(
+          {
+            error:
+              "Gagal memeriksa divisi",
+          },
+          500
+        );
       }
 
       if (!division) {
-        throw new Error("Divisi yang dipilih tidak ditemukan");
+        throw new Error(
+          "Divisi yang dipilih tidak ditemukan"
+        );
       }
     }
 
-    const { data: created, error: createError } = await adminClient.auth.admin.createUser({
-      email,
-      password,
-      // Akun dibuat oleh admin, sehingga dapat langsung dipakai login.
-      email_confirm: true,
-      user_metadata: {
-        nama,
-        nik_nim: nikNim,
-        no_hp: noHp,
-        jabatan,
-        divisi_id: divisiId,
-        role,
-      },
-    });
+    // =====================================================
+    // BUAT USER DI SUPABASE AUTH
+    // =====================================================
 
-    if (createError || !created.user) {
-      const message = createError?.message ?? "Akun gagal dibuat";
-      const normalizedMessage = message.toLowerCase();
+    const {
+      data: created,
+      error: createError,
+    } =
+      await adminClient.auth.admin.createUser(
+        {
+          email,
+          password,
+
+          // Admin membuat akun,
+          // jadi langsung bisa login
+          email_confirm: true,
+
+          // Metadata akan dibaca oleh
+          // trigger handle_new_user()
+          user_metadata: {
+            nama,
+            nik_nim: nikNim,
+            no_hp: noHp,
+            jabatan,
+            divisi_id: divisiId,
+            role,
+          },
+        }
+      );
+
+    // =====================================================
+    // HANDLE ERROR AUTH
+    // =====================================================
+
+    if (
+      createError ||
+      !created.user
+    ) {
+      const message =
+        createError?.message ??
+        "Akun gagal dibuat";
+
+      const normalizedMessage =
+        message.toLowerCase();
 
       if (
-        normalizedMessage.includes("already registered") ||
-        normalizedMessage.includes("already exists") ||
-        normalizedMessage.includes("duplicate")
+        normalizedMessage.includes(
+          "already registered"
+        ) ||
+        normalizedMessage.includes(
+          "already exists"
+        ) ||
+        normalizedMessage.includes(
+          "user already registered"
+        ) ||
+        normalizedMessage.includes(
+          "duplicate"
+        )
       ) {
-        return jsonResponse({ error: "Email tersebut sudah terdaftar" }, 409);
+        return jsonResponse(
+          {
+            error:
+              "Email tersebut sudah terdaftar",
+          },
+          409
+        );
       }
 
-      console.error("Gagal membuat akun Supabase Auth:", createError);
-      return jsonResponse({ error: "Gagal membuat akun pengguna" }, 400);
+      console.error(
+        "Gagal membuat akun Supabase Auth:",
+        createError
+      );
+
+      return jsonResponse(
+        {
+          error:
+            message ||
+            "Gagal membuat akun pengguna",
+        },
+        400
+      );
     }
 
-    // Trigger handle_new_user tetap boleh mengisi data lebih dulu. Upsert
-    // eksplisit di sini diperlukan agar pembuatan pengguna tetap berhasil
-    // walaupun trigger belum terpasang pada project Supabase atau gagal
-    // mengisi salah satu tabel.
-    const { error: profileError } = await adminClient.from("profiles").upsert(
+    // =====================================================
+    // BERHASIL
+    //
+    // Trigger handle_new_user() akan membuat:
+    //
+    // auth.users
+    //      ↓
+    // profiles
+    //      +
+    // user_roles
+    //
+    // =====================================================
+
+    console.log(
+      "Akun berhasil dibuat:",
       {
         id: created.user.id,
-        nama,
-        email,
-        nik_nim: nikNim,
-        no_hp: noHp,
-        jabatan,
-        divisi_id: divisiId,
-        status_aktif: false,
-      },
-      { onConflict: "id" },
-    );
-
-    if (profileError) {
-      console.error("Gagal menyimpan profil pengguna:", profileError);
-      await adminClient.from("profiles").delete().eq("id", created.user.id);
-      await adminClient.auth.admin.deleteUser(created.user.id);
-      return jsonResponse({ error: "Akun dibuat, tetapi data profil gagal disimpan" }, 500);
-    }
-
-    const { error: roleError } = await adminClient.from("user_roles").upsert(
-      {
-        user_id: created.user.id,
+        email: created.user.email,
         role,
-      },
-      { onConflict: "user_id,role" },
+      }
     );
-
-    if (roleError) {
-      console.error("Gagal menyimpan role pengguna:", roleError);
-      await adminClient.from("user_roles").delete().eq("user_id", created.user.id);
-      await adminClient.from("profiles").delete().eq("id", created.user.id);
-      await adminClient.auth.admin.deleteUser(created.user.id);
-      return jsonResponse({ error: "Akun dibuat, tetapi peran pengguna gagal disimpan" }, 500);
-    }
 
     return jsonResponse({
-      message: "Akun pengguna berhasil dibuat",
+      message:
+        "Akun pengguna berhasil dibuat",
+
       user: {
         id: created.user.id,
         email: created.user.email,
+        role,
       },
     });
   } catch (error) {
-    return jsonResponse({ error: getErrorMessage(error) }, 400);
+    console.error(
+      "Error create-user:",
+      error
+    );
+
+    return jsonResponse(
+      {
+        error:
+          getErrorMessage(error),
+      },
+      400
+    );
   }
 });

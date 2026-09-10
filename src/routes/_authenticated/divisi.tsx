@@ -25,12 +25,12 @@ import {
 export const Route = createFileRoute("/_authenticated/divisi")({
   head: () => ({
     meta: [
-      { title: "Data Divisi — Merapi Tani Instrumen" },
+      { title: "Data Divisi — Merapi Tani" },
       {
         name: "description",
         content: "Kelola daftar divisi kerja PT Merapi Tani Instrumen untuk laporan harian.",
       },
-      { property: "og:title", content: "Data Divisi — Merapi Tani Instrumen" },
+      { property: "og:title", content: "Data Divisi — Merapi Tani" },
       { property: "og:description", content: "Tambah, lihat, dan hapus divisi kerja perusahaan." },
     ],
   }),

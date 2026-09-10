@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BadgeCheck, ClipboardList, Images, LineChart } from "lucide-react";
+import { BadgeCheck, ClipboardList, Images, LineChart, Leaf } from "lucide-react";
 import { APP_NAME, COMPANY } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,13 +8,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Merapi Tani Instrumen Daily Report System" },
+      { title: "Merapi Tani Daily Report System" },
       {
         name: "description",
         content:
           "Sistem laporan harian PT Merapi Tani Instrumen: pencatatan pekerjaan, foto bukti, validasi supervisor, dan rekap ekspor.",
       },
-      { property: "og:title", content: "Merapi Tani Instrumen Daily Report System" },
+      { property: "og:title", content: "Merapi Tani Daily Report System" },
       {
         property: "og:description",
         content:
@@ -54,11 +54,11 @@ function Landing() {
   return (
     <div className="min-h-screen bg-background">
       <header className="flex items-center gap-3 border-b border-border px-4 py-4 lg:px-10">
-        <div className="grid size-10 place-items-center overflow-hidden rounded-lg bg-white">
-          <img src="/mertani-logo.png" alt="Logo Mertani" className="size-full object-contain" />
+        <div className="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+          <Leaf className="size-5" />
         </div>
         <div className="min-w-0">
-          <p className="truncate font-display text-sm font-semibold">Merapi Tani Instrumen</p>
+          <p className="truncate font-display text-sm font-semibold">Merapi Tani</p>
           <p className="truncate text-xs text-muted-foreground">Daily Report System</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
