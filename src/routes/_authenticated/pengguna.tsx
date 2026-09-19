@@ -2,12 +2,25 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Search, UserPlus } from "lucide-react";
+import {
+  Download,
+  FileSpreadsheet,
+  FileText,
+  MailPlus,
+  Search,
+  UserPlus,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/auth";
 import { fetchDivisi } from "@/lib/reports";
 import { ROLE_LABEL, formatTanggal, type AppRole } from "@/lib/constants";
+import {
+  exportUsersCSV,
+  exportUsersXLSX,
+  exportUsersPDF,
+  type UserExportRow,
+} from "@/lib/export";
 
 import { PageHeader } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -74,6 +87,9 @@ type ProfileRow = {
   tanggal_bergabung: string;
 };
 
+type UserRow = ProfileRow & { role: AppRole };
+type UserTypeFilter = "semua" | "karyawan" | "magang";
+
 type CreateUserForm = {
   nama: string;
   email: string;
@@ -86,7 +102,7 @@ type CreateUserForm = {
 };
 
 async function fetchProfiles(): Promise<
-  (ProfileRow & { role: AppRole })[]
+  UserRow[]
 > {
   const [{ data: profiles, error }, { data: roles }] = await Promise.all([
     supabase
@@ -131,8 +147,13 @@ function PenggunaPage() {
   const queryClient = useQueryClient();
 
   const [q, setQ] = useState("");
+  const [userTypeFilter, setUserTypeFilter] =
+    useState<UserTypeFilter>("semua");
   const [openCreateUser, setOpenCreateUser] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [openAllowlist, setOpenAllowlist] = useState(false);
+  const [allowlistEmail, setAllowlistEmail] = useState("");
+  const [isSavingAllowlist, setIsSavingAllowlist] = useState(false);
 
   const [form, setForm] = useState<CreateUserForm>({
     nama: "",
@@ -286,12 +307,111 @@ function PenggunaPage() {
     }
   }
 
-  const filtered = users.filter((u) =>
-    [u.nama, u.email ?? "", u.nik_nim ?? ""]
-      .join(" ")
-      .toLowerCase()
-      .includes(q.toLowerCase()),
-  );
+  async function addInternEmail() {
+    const email = allowlistEmail.trim().toLowerCase();
+
+    if (!me?.id) {
+      toast.error("Sesi admin tidak ditemukan");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Masukkan email anak magang yang valid");
+      return;
+    }
+
+    setIsSavingAllowlist(true);
+
+    const { error } = await supabase
+      .from("registration_allowlist")
+      .upsert(
+        {
+          email,
+          created_by: me.id,
+        },
+        { onConflict: "email" },
+      );
+
+    setIsSavingAllowlist(false);
+
+    if (error) {
+      toast.error("Gagal menambahkan email: " + error.message);
+      return;
+    }
+
+    setAllowlistEmail("");
+    setOpenAllowlist(false);
+    toast.success("Email anak magang diizinkan untuk mendaftar");
+  }
+
+  const normalizedQuery = q.trim().toLowerCase();
+  const filtered = users.filter((u) => {
+    const matchesType =
+      userTypeFilter === "semua" || u.role === userTypeFilter;
+    const matchesQuery =
+      !normalizedQuery ||
+      [u.nama, u.email ?? "", u.nik_nim ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery);
+
+    return matchesType && matchesQuery;
+  });
+
+  function getExportRows(sourceUsers: UserRow[]): UserExportRow[] {
+    const divisionMap = new Map(
+      divisi.map((division) => [division.id, division.nama_divisi]),
+    );
+
+    return sourceUsers.map((user) => ({
+      nama: user.nama,
+      email: user.email ?? "",
+      nik_nim: user.nik_nim ?? "",
+      no_hp: user.no_hp ?? "",
+      jabatan: user.jabatan ?? "",
+      role: user.role,
+      divisi: user.divisi_id ? divisionMap.get(user.divisi_id) ?? "-" : "-",
+      status_aktif: user.status_aktif,
+      tanggal_bergabung: user.tanggal_bergabung,
+    }));
+  }
+
+  function downloadUsersCsv(sourceUsers: UserRow[]) {
+    if (!sourceUsers.length) {
+      toast.info("Tidak ada data pengguna untuk diunduh");
+      return;
+    }
+
+    exportUsersCSV(
+      getExportRows(sourceUsers),
+      `data-pengguna-${new Date().toISOString().slice(0, 10)}`,
+    );
+  }
+
+  function downloadUsersPdf(sourceUsers: UserRow[]) {
+    if (!sourceUsers.length) {
+      toast.info("Tidak ada data pengguna untuk diunduh");
+      return;
+    }
+
+    exportUsersPDF(
+      getExportRows(sourceUsers),
+      `data-pengguna-${new Date().toISOString().slice(0, 10)}`,
+      "Daftar Data Pengguna",
+    );
+  }
+
+  function downloadUsersXlsx(sourceUsers: UserRow[]) {
+    if (!sourceUsers.length) {
+      toast.info("Tidak ada data pengguna untuk diunduh");
+      return;
+    }
+
+    exportUsersXLSX(
+      getExportRows(sourceUsers),
+      `data-pengguna-${new Date().toISOString().slice(0, 10)}`,
+    );
+  }
 
   return (
     <div>
@@ -301,13 +421,43 @@ function PenggunaPage() {
           description="Atur divisi dan status keaktifan karyawan serta anak magang."
         />
 
-        <Button
-          onClick={() => setOpenCreateUser(true)}
-          className="mt-1"
-        >
-          <UserPlus className="mr-2 size-4" />
-          Tambah Pengguna
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            variant="outline"
+            disabled={!filtered.length}
+            onClick={() => downloadUsersCsv(filtered)}
+          >
+            <Download className="mr-2 size-4" />
+            Unduh CSV
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!filtered.length}
+            onClick={() => downloadUsersXlsx(filtered)}
+          >
+            <FileSpreadsheet className="mr-2 size-4" />
+            Unduh Excel
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!filtered.length}
+            onClick={() => downloadUsersPdf(filtered)}
+          >
+            <FileText className="mr-2 size-4" />
+            Unduh PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setOpenAllowlist(true)}
+          >
+            <MailPlus className="mr-2 size-4" />
+            Izinkan Daftar Magang
+          </Button>
+          <Button onClick={() => setOpenCreateUser(true)} className="mt-1">
+            <UserPlus className="mr-2 size-4" />
+            Tambah Pengguna
+          </Button>
+        </div>
       </div>
 
       {/* Dialog Tambah Pengguna */}
@@ -324,7 +474,8 @@ function PenggunaPage() {
             <DialogTitle>Tambah Pengguna</DialogTitle>
 
             <DialogDescription>
-              Buat akun login baru untuk karyawan atau anak magang.
+              Buat akun login lengkap untuk karyawan atau pengguna yang dibuat
+              langsung oleh Admin.
             </DialogDescription>
           </DialogHeader>
 
@@ -508,7 +659,7 @@ function PenggunaPage() {
                   </SelectItem>
 
                   <SelectItem value="magang">
-                    Magang
+                    Anak Magang
                   </SelectItem>
 
                   <SelectItem value="supervisor">
@@ -542,26 +693,99 @@ function PenggunaPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Pencarian */}
-      <Card className="mb-4 shadow-card">
-        <CardContent className="grid gap-2 pt-6 sm:max-w-sm">
-          <Label htmlFor="cari">
-            Cari pengguna
-          </Label>
+      <Dialog
+        open={openAllowlist}
+        onOpenChange={(open) => {
+          if (!isSavingAllowlist) {
+            setOpenAllowlist(open);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Izinkan Pendaftaran Anak Magang</DialogTitle>
+            <DialogDescription>
+              hanya mengizinkan email pendaftaran untuk mendaftar sebagai anak magang.
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-
+          <div className="grid gap-2 py-4">
+            <Label htmlFor="allowlist-email">Email Anak Magang</Label>
             <Input
-              id="cari"
-              className="pl-9"
-              placeholder="Nama, email, atau NIK/NIM"
-              value={q}
-              onChange={(e) =>
-                setQ(e.target.value)
-              }
+              id="allowlist-email"
+              type="email"
+              placeholder="nama@email.com"
+              value={allowlistEmail}
+              onChange={(event) => setAllowlistEmail(event.target.value)}
+              disabled={isSavingAllowlist}
             />
           </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSavingAllowlist}
+              onClick={() => setOpenAllowlist(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              disabled={isSavingAllowlist}
+              onClick={addInternEmail}
+            >
+              {isSavingAllowlist ? "Menyimpan..." : "Izinkan Email"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pencarian */}
+      <Card className="mb-4 shadow-card">
+        <CardContent className="grid gap-4 pt-6 md:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="grid gap-2">
+            <Label htmlFor="cari">Cari pengguna</Label>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+
+              <Input
+                id="cari"
+                className="pl-9"
+                placeholder="Nama, email, atau NIK/NIM"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="filter-jenis-pengguna">Jenis pengguna</Label>
+
+            <Select
+              value={userTypeFilter}
+              onValueChange={(value) =>
+                setUserTypeFilter(value as UserTypeFilter)
+              }
+            >
+              <SelectTrigger id="filter-jenis-pengguna">
+                <SelectValue placeholder="Pilih jenis pengguna" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="semua">Semua pengguna</SelectItem>
+                <SelectItem value="karyawan">Karyawan</SelectItem>
+                <SelectItem value="magang">Anak magang</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <p className="text-xs text-muted-foreground md:col-span-2">
+            Menampilkan {filtered.length} dari {users.length} pengguna.
+            Unduhan mengikuti pencarian dan jenis pengguna yang dipilih. Pilih
+            <strong> Semua pengguna</strong> untuk mengunduh seluruh data.
+          </p>
         </CardContent>
       </Card>
 
