@@ -95,9 +95,25 @@ function AuthPage() {
       toast.error(parsed.error.issues[0]?.message ?? "Data tidak valid");
       return;
     }
-    const { email, password, ...meta } = parsed.data;
+    const { email: rawEmail, password, ...meta } = parsed.data;
+    const email = rawEmail.toLowerCase();
 
     setLoading(true);
+    const { data: allowed, error: allowlistError } = await supabase.rpc(
+      "is_registration_email_allowed",
+      { p_email: email },
+    );
+    if (allowlistError) {
+      setLoading(false);
+      toast.error("Pendaftaran belum dapat diproses. Silakan coba lagi nanti.");
+      return;
+    }
+    if (!allowed) {
+      setLoading(false);
+      toast.error("Email ini belum didaftarkan oleh Admin.");
+      return;
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -111,9 +127,7 @@ function AuthPage() {
       toast.error("Gagal mendaftar: " + error.message);
       return;
     }
-    toast.success(
-      "Pendaftaran berhasil. Akun Anda menunggu persetujuan Admin sebelum bisa mengisi laporan.",
-    );
+    toast.success("Pendaftaran berhasil. Silakan cek email untuk konfirmasi akun Anda.");
     setMode("login");
   }
 
@@ -190,7 +204,8 @@ function AuthPage() {
             <CardHeader>
               <CardTitle className="font-display">{APP_NAME}</CardTitle>
               <CardDescription>
-                Masuk dengan akun perusahaan, atau daftar khusus anak magang.
+                Masuk dengan akun perusahaan. Pendaftaran hanya untuk email yang sudah diizinkan
+                Admin.
               </CardDescription>
             </CardHeader>
             <CardContent>
