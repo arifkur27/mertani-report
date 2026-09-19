@@ -2,8 +2,10 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
+  ROLE_LABEL,
   STATUS_KERJA_LABEL,
   STATUS_VALIDASI_LABEL,
+  type AppRole,
   type StatusKerja,
   type StatusValidasi,
   formatTanggal,
@@ -98,6 +100,88 @@ export function exportPDF(rows: ExportRow[], filename: string, subtitle: string)
     headStyles: { fillColor: [46, 125, 50], textColor: 255 },
     theme: "grid",
   });
+  doc.save(`${filename}.pdf`);
+}
+
+export type UserExportRow = {
+  nama: string;
+  email: string;
+  nik_nim: string;
+  no_hp: string;
+  jabatan: string;
+  role: AppRole;
+  divisi: string;
+  status_aktif: boolean;
+  tanggal_bergabung: string;
+};
+
+const USER_HEADERS = [
+  "Nama Lengkap",
+  "Email",
+  "NIK / NIM",
+  "Nomor HP",
+  "Jabatan",
+  "Peran",
+  "Divisi",
+  "Status",
+  "Tanggal Bergabung",
+];
+
+function userMatrix(rows: UserExportRow[]) {
+  return rows.map((user) => [
+    user.nama,
+    user.email,
+    user.nik_nim,
+    user.no_hp,
+    user.jabatan,
+    ROLE_LABEL[user.role],
+    user.divisi,
+    user.status_aktif ? "Aktif" : "Menunggu persetujuan",
+    formatTanggal(user.tanggal_bergabung),
+  ]);
+}
+
+export function exportUsersCSV(rows: UserExportRow[], filename: string) {
+  const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const csv = [USER_HEADERS, ...userMatrix(rows)]
+    .map((line) => line.map(escape).join(";"))
+    .join("\r\n");
+
+  saveBlob(
+    new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
+    `${filename}.csv`,
+  );
+}
+
+export function exportUsersXLSX(rows: UserExportRow[], filename: string) {
+  const ws = XLSX.utils.aoa_to_sheet([USER_HEADERS, ...userMatrix(rows)]);
+  ws["!cols"] = USER_HEADERS.map(() => ({ wch: 22 }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data Pengguna");
+  XLSX.writeFile(wb, `${filename}.xlsx`);
+}
+
+export function exportUsersPDF(
+  rows: UserExportRow[],
+  filename: string,
+  subtitle: string,
+) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  doc.setFontSize(14);
+  doc.text("Merapi Tani Instrumen Daily Report System", 40, 36);
+  doc.setFontSize(9);
+  doc.text(`PT Merapi Tani Instrumen — ${subtitle}`, 40, 52);
+
+  autoTable(doc, {
+    head: [USER_HEADERS],
+    body: userMatrix(rows).map((row) => row.map((cell) => String(cell ?? ""))),
+    startY: 68,
+    styles: { fontSize: 7, cellPadding: 3, overflow: "linebreak" },
+    headStyles: { fillColor: [46, 125, 50], textColor: 255 },
+    theme: "grid",
+  });
+
   doc.save(`${filename}.pdf`);
 }
 
