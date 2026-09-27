@@ -104,7 +104,10 @@ type CreateUserForm = {
 async function fetchProfiles(): Promise<
   UserRow[]
 > {
-  const [{ data: profiles, error }, { data: roles }] = await Promise.all([
+  const [
+    { data: profiles, error: profileError },
+    { data: roles, error: rolesError },
+  ] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -116,7 +119,8 @@ async function fetchProfiles(): Promise<
     supabase.from("user_roles").select("user_id, role"),
   ]);
 
-  if (error) throw error;
+  if (profileError) throw profileError;
+  if (rolesError) throw rolesError;
 
   const order: AppRole[] = [
     "admin",
@@ -171,11 +175,16 @@ function PenggunaPage() {
     queryFn: fetchDivisi,
   });
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: users = [], isLoading, isError } = useQuery({
     queryKey: ["profiles"],
     queryFn: fetchProfiles,
     enabled: me?.role === "admin",
   });
+
+  const activeUsers = users.filter((user) => user.status_aktif);
+  const activeEmployees = activeUsers.filter((user) => user.role === "karyawan");
+  const activeInterns = activeUsers.filter((user) => user.role === "magang");
+  const pendingUsers = users.filter((user) => !user.status_aktif);
 
   if (me && me.role !== "admin") {
     return (
@@ -458,6 +467,24 @@ function PenggunaPage() {
             Tambah Pengguna
           </Button>
         </div>
+      </div>
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Karyawan Aktif", activeEmployees.length],
+          ["Anak Magang Aktif", activeInterns.length],
+          ["Semua Akun Aktif", activeUsers.length],
+          ["Menunggu Aktivasi", pendingUsers.length],
+        ].map(([label, value]) => (
+          <Card key={label} className="shadow-card">
+            <CardContent className="pt-5">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+              <p className="mt-1 font-display text-2xl font-bold">
+                {isLoading ? "—" : value}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Dialog Tambah Pengguna */}
@@ -794,6 +821,10 @@ function PenggunaPage() {
         <CardContent className="overflow-x-auto pt-6">
           {isLoading ? (
             <Skeleton className="h-56 w-full" />
+          ) : isError ? (
+            <p className="py-10 text-center text-sm text-destructive">
+              Data pengguna tidak dapat dibaca. Periksa akses RLS akun Admin.
+            </p>
           ) : filtered.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               Tidak ada pengguna yang cocok.
