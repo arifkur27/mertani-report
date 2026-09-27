@@ -40,11 +40,25 @@ function GaleriPage() {
   const { data: me } = useMe();
   const [divisiId, setDivisiId] = useState("");
   const [tanggal, setTanggal] = useState("");
+  const isPersonalGallery = me?.role === "karyawan" || me?.role === "magang";
 
   const { data: divisi = [] } = useQuery({ queryKey: ["divisi"], queryFn: fetchDivisi });
   const { data: reports = [], isLoading } = useQuery({
-    queryKey: ["reports", { divisiId, tanggal, galeri: true }],
-    queryFn: () => fetchReports({ divisiId, tanggal }),
+    queryKey: [
+      "reports",
+      {
+        divisiId: isPersonalGallery ? "" : divisiId,
+        tanggal,
+        userId: isPersonalGallery ? me?.id : "",
+        galeri: true,
+      },
+    ],
+    queryFn: () =>
+      fetchReports({
+        divisiId: isPersonalGallery ? undefined : divisiId,
+        tanggal,
+        userId: isPersonalGallery ? me?.id : undefined,
+      }),
     enabled: !!me,
   });
 
@@ -54,30 +68,44 @@ function GaleriPage() {
     <div>
       <PageHeader
         title="Galeri Bukti Kerja"
-        description="Foto bukti dari laporan harian, dikelompokkan per laporan."
+        description={
+          isPersonalGallery
+            ? "Foto bukti dari laporan Anda sendiri."
+            : "Foto bukti dari laporan harian, dikelompokkan per laporan."
+        }
       />
 
       <Card className="mb-6 shadow-card">
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
-          <div className="grid gap-2">
-            <Label>Divisi</Label>
-            <Select value={divisiId || "all"} onValueChange={(v) => setDivisiId(v === "all" ? "" : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Semua divisi" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua divisi</SelectItem>
-                {divisi.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.nama_divisi}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isPersonalGallery && (
+            <div className="grid gap-2">
+              <Label>Divisi</Label>
+              <Select
+                value={divisiId || "all"}
+                onValueChange={(v) => setDivisiId(v === "all" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua divisi" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua divisi</SelectItem>
+                  {divisi.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.nama_divisi}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid gap-2">
             <Label htmlFor="tgl">Tanggal</Label>
-            <Input id="tgl" type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
+            <Input
+              id="tgl"
+              type="date"
+              value={tanggal}
+              onChange={(e) => setTanggal(e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
