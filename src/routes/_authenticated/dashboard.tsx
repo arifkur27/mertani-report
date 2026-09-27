@@ -91,32 +91,19 @@ function Dashboard() {
     enabled: !!me,
   });
 
-  const { data: counts, isError: isCountsError } = useQuery({
+  const { data: counts } = useQuery({
     queryKey: ["dashboard-counts"],
     enabled: me?.role === "admin",
     queryFn: async () => {
-      const [
-        { count: divisiCount, error: divisiError },
-        { data: profiles, error: profilesError },
-        { data: roles, error: rolesError },
-      ] = await Promise.all([
+      const [{ count: divisiCount }, { data: roles }] = await Promise.all([
         supabase.from("divisi").select("id", { count: "exact", head: true }),
-        supabase.from("profiles").select("id, status_aktif"),
         supabase.from("user_roles").select("role"),
       ]);
-      if (divisiError) throw divisiError;
-      if (profilesError) throw profilesError;
-      if (rolesError) throw rolesError;
-
-      const activeUserIds = new Set(
-        (profiles ?? []).filter((profile) => profile.status_aktif).map((profile) => profile.id),
-      );
-      const activeRoles = (roles ?? []).filter((role) => activeUserIds.has(role.user_id));
-
+      const list = roles ?? [];
       return {
         divisi: divisiCount ?? 0,
-        karyawan: activeRoles.filter((r) => r.role === "karyawan").length,
-        magang: activeRoles.filter((r) => r.role === "magang").length,
+        karyawan: list.filter((r) => r.role === "karyawan" || r.role === "supervisor").length,
+        magang: list.filter((r) => r.role === "magang").length,
       };
     },
   });
@@ -191,16 +178,8 @@ function Dashboard() {
         </div>
       ) : me?.role === "admin" ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Karyawan Aktif"
-            value={isCountsError ? "—" : counts?.karyawan ?? 0}
-            icon={Users}
-          />
-          <StatCard
-            label="Anak Magang Aktif"
-            value={isCountsError ? "—" : counts?.magang ?? 0}
-            icon={GraduationCap}
-          />
+          <StatCard label="Total Karyawan" value={counts?.karyawan ?? 0} icon={Users} />
+          <StatCard label="Total Anak Magang" value={counts?.magang ?? 0} icon={GraduationCap} />
           <StatCard
             label="Report Hari Ini"
             value={todayReports.length}
