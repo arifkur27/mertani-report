@@ -14,6 +14,7 @@ import {
   type StatusKerja,
 } from "@/lib/constants";
 import type { ReportRow } from "@/lib/reports";
+import { compressImageForUpload } from "@/lib/image-compression";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -89,9 +90,13 @@ export function ReportForm({ initial }: { initial?: ReportRow }) {
 
   async function uploadPhotos(reportId: string, userId: string) {
     for (const file of files) {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const compressed = await compressImageForUpload(file);
+      const ext = compressed.type === "image/png" ? "png" : "jpg";
       const path = `${userId}/${reportId}-${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from(PHOTO_BUCKET).upload(path, file);
+      const { error } = await supabase.storage.from(PHOTO_BUCKET).upload(path, compressed, {
+        contentType: compressed.type,
+        upsert: false,
+      });
       if (error) throw error;
       const { error: insErr } = await supabase
         .from("report_photos")
@@ -292,6 +297,7 @@ export function ReportForm({ initial }: { initial?: ReportRow }) {
           <CardContent className="grid gap-3">
             <p className="text-xs text-muted-foreground">
               JPG/PNG, maksimal 5 MB per foto, {MAX_PHOTOS} foto per laporan.
+              Foto besar akan dikompres otomatis sebelum diunggah.
               {existingCount ? ` Sudah ada ${existingCount} foto.` : ""}
             </p>
             <Label
