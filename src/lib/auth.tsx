@@ -36,7 +36,10 @@ export function useMe() {
       const user = userData.user;
       if (!user) return null;
 
-      const [{ data: profile }, { data: roles }] = await Promise.all([
+      const [
+        { data: profile, error: profileError },
+        { data: roles, error: rolesError },
+      ] = await Promise.all([
         supabase
           .from("profiles")
           .select("*, divisi:divisi_id(nama_divisi)")
@@ -44,6 +47,12 @@ export function useMe() {
           .maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
       ]);
+
+      if (profileError) throw profileError;
+      if (rolesError) throw rolesError;
+      if (!profile) {
+        throw new Error("Profil pengguna belum tersedia di database");
+      }
 
       const order: AppRole[] = ["admin", "supervisor", "karyawan", "magang"];
       const found = (roles ?? []).map((r) => r.role as AppRole);
