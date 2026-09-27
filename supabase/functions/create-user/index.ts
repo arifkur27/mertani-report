@@ -182,6 +182,24 @@ Deno.serve(async (request: Request) => {
       }
     }
 
+    // The user-creation trigger requires every non-bootstrap email to be
+    // allowlisted. This write is performed with the service-role client, so
+    // a public signup cannot add its own email to the allowlist.
+    const { error: allowlistError } = await adminClient
+      .from("registration_allowlist")
+      .upsert(
+        {
+          email,
+          created_by: userData.user.id,
+        },
+        { onConflict: "email" },
+      );
+
+    if (allowlistError) {
+      console.error("Gagal menyiapkan allowlist akun:", allowlistError);
+      return jsonResponse({ error: "Gagal menyiapkan pendaftaran akun" }, 500);
+    }
+
     const { data: created, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,
@@ -238,12 +256,25 @@ Deno.serve(async (request: Request) => {
       return jsonResponse({ error: "Akun dibuat, tetapi data profil gagal disimpan" }, 500);
     }
 
-    const { error: roleError } = await adminClient.from("user_roles").upsert(
+    // The trigger creates a safe default role (magang). Replace it with the
+    // role explicitly selected by the already-authorized admin.
+    const { error: clearRoleError } = await adminClient
+      .from("user_roles")
+      .delete()
+      .eq("user_id", created.user.id);
+
+    if (clearRoleError) {
+      console.error("Gagal membersihkan role bawaan pengguna:", clearRoleError);
+      await adminClient.from("profiles").delete().eq("id", created.user.id);
+      await adminClient.auth.admin.deleteUser(created.user.id);
+      return jsonResponse({ error: "Role pengguna gagal disiapkan" }, 500);
+    }
+
+    const { error: roleError } = await adminClient.from("user_roles").insert(
       {
         user_id: created.user.id,
         role,
       },
-      { onConflict: "user_id,role" },
     );
 
     if (roleError) {
