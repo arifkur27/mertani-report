@@ -92,21 +92,56 @@ function Dashboard() {
   });
 
   const { data: counts } = useQuery({
-    queryKey: ["dashboard-counts"],
-    enabled: me?.role === "admin",
-    queryFn: async () => {
-      const [{ count: divisiCount }, { data: roles }] = await Promise.all([
-        supabase.from("divisi").select("id", { count: "exact", head: true }),
-        supabase.from("user_roles").select("role"),
-      ]);
-      const list = roles ?? [];
-      return {
-        divisi: divisiCount ?? 0,
-        karyawan: list.filter((r) => r.role === "karyawan" || r.role === "supervisor").length,
-        magang: list.filter((r) => r.role === "magang").length,
-      };
-    },
-  });
+  queryKey: ["dashboard-counts"],
+  enabled: me?.role === "admin",
+  queryFn: async () => {
+    const [
+      { count: divisiCount, error: divisiError },
+      { data: profiles, error: profilesError },
+      { data: roles, error: rolesError },
+    ] = await Promise.all([
+      supabase.from("divisi").select("id", { count: "exact", head: true }),
+      supabase.from("profiles").select("id, status_aktif"),
+      supabase.from("user_roles").select("role, user_id"),
+    ]);
+
+    if (divisiError) throw divisiError;
+    if (profilesError) throw profilesError;
+    if (rolesError) throw rolesError;
+
+    const activeUserIds = new Set(
+      (profiles ?? [])
+        .filter((profile) => profile.status_aktif)
+        .map((profile) => profile.id),
+    );
+
+    const rolesByUser = new Map<string, Set<string>>();
+
+    for (const role of roles ?? []) {
+      if (!activeUserIds.has(role.user_id)) continue;
+
+      const userRoles = rolesByUser.get(role.user_id) ?? new Set<string>();
+      userRoles.add(role.role);
+      rolesByUser.set(role.user_id, userRoles);
+    }
+
+    const roleOrder = ["admin", "supervisor", "karyawan", "magang"] as const;
+
+    const activeRoles = [...rolesByUser.values()]
+      .map((userRoles) => roleOrder.find((role) => userRoles.has(role)))
+      .filter(
+        (role): role is (typeof roleOrder)[number] => Boolean(role),
+      );
+
+    return {
+      divisi: divisiCount ?? 0,
+      karyawan: activeRoles.filter(
+        (role) => role === "karyawan" || role === "supervisor",
+      ).length,
+      magang: activeRoles.filter((role) => role === "magang").length,
+    };
+  },
+});
 
   const mine = reports.filter((r) => r.user_id === me?.id);
   const todayReports = reports.filter((r) => r.tanggal === today);
